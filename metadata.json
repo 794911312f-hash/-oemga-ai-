@@ -1,0 +1,6 @@
+{
+  "name": "Omega Brain AI | أوميجا للذكاء الاصطناعي",
+  "description": "منصة الذكاء الاصطناعي المتكاملة ونظام العقل التنفيذي Omega Brain مع التمييز المعرفي الدقيق بين الأسئلة الأدبية والعلمية، ومحرك التوقيت والتقويم اللحظي، واستوديو ومحرر معادلات LaTeX التفاعلي، ومحركات التفكير والفيزياء ومحاكي الأكواد.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
