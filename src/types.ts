@@ -235,3 +235,36 @@ export interface MoEExpertState {
   gate_weight: number;
   active: boolean;
 }
+
+export interface CodebaseFileMetadata {
+  path: string;
+  name: string;
+  category: 'backend' | 'frontend' | 'component' | 'config' | 'style';
+  language: string;
+  description: string;
+  lines?: number;
+  size?: number;
+  content?: string;
+  keyExports?: string[];
+  keyFeatures?: string[];
+}
+
+export interface CodebaseManifest {
+  appName: string;
+  version: string;
+  runtime: string;
+  framework: string;
+  architectureSummary: string;
+  totalFiles: number;
+  totalLines: number;
+  files: CodebaseFileMetadata[];
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+  endpoints: {
+    method: string;
+    path: string;
+    description: string;
+    handler: string;
+  }[];
+}
+

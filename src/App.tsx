@@ -8,6 +8,7 @@ import { WorldModelView } from "./components/WorldModelView";
 import { CodeSandbox } from "./components/CodeSandbox";
 import { LatexStudio } from "./components/LatexStudio";
 import { ChronoMatrix } from "./components/ChronoMatrix";
+import { CodebaseExplorer } from "./components/CodebaseExplorer";
 import { BrainState, ConsciousnessState, OptimizerTelemetry, ThoughtTrace, ReasoningStrategy, ChatAttachment } from "./types";
 
 export default function App() {
@@ -180,6 +181,14 @@ export default function App() {
             onSendMessage={handleSendMessage}
             isThinking={isThinking}
             thoughtTraces={thoughtTraces}
+          />
+        )}
+        {activeTab === "codebase" && (
+          <CodebaseExplorer
+            onAskBrain={(codePrompt) => {
+              setActiveTab("brain");
+              handleSendMessage(codePrompt, "tree_of_thought");
+            }}
           />
         )}
         {activeTab === "latex" && (

@@ -6,6 +6,7 @@ import {
   Database, 
   Globe2, 
   Code2, 
+  FileCode2,
   Activity, 
   Sparkles,
   Zap,
@@ -65,6 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const navTabs = [
     { id: "brain", label: "العقل التنفيذي", sublabel: "Omega Brain", icon: Brain },
+    { id: "codebase", label: "كود ومعمارية النظام", sublabel: "Self-Code Awareness", icon: FileCode2 },
     { id: "latex", label: "استوديو LaTeX", sublabel: "Math & Physics", icon: Sigma },
     { id: "time", label: "الوقت والتقويم", sublabel: "Chrono Matrix", icon: Clock },
     { id: "swarm", label: "خلية الوكلاء", sublabel: "Swarm Agents", icon: Users },
