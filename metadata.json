@@ -1,6 +1,6 @@
 {
   "name": "Omega Brain AI | أوميجا للذكاء الاصطناعي",
-  "description": "منصة الذكاء الاصطناعي المتكاملة ونظام العقل التنفيذي Omega Brain مع التمييز المعرفي الدقيق بين الأسئلة الأدبية والعلمية، ومحرك التوقيت والتقويم اللحظي، واستوديو ومحرر معادلات LaTeX التفاعلي، ومحركات التفكير والفيزياء ومحاكي الأكواد.",
+  "description": "منصة الذكاء الاصطناعي المتكاملة ونظام العقل التنفيذي Omega Brain مع وكيل البحث الحي (Search Agent) وربط News API، ومزامنة مصفوفة الذاكرة المعرفية وجلسات التفكير سحابياً مع Firebase Firestore، وضمان معادلة زمن الاستجابة T_total = T_fetch + T_inference + T_render < 2000ms، ومحرك التوقيت اللحظي ومحرر معادلات LaTeX التفاعلي.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

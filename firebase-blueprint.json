@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "MemorySnapshot": {
+      "title": "MemorySnapshot",
+      "description": "Snapshot of 5-tier cognitive memory matrix and latent links",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "stats": { "type": "object" },
+        "memory_data": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "timestamp": { "type": "number" },
+        "version": { "type": "string" }
+      },
+      "required": ["id", "title", "timestamp"]
+    },
+    "ThinkingSession": {
+      "title": "ThinkingSession",
+      "description": "Stored cognitive thinking session with thought traces and strategy",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "traces": { "type": "array" },
+        "activeStrategy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "title", "updatedAt"]
+    },
+    "CognitiveConcept": {
+      "title": "CognitiveConcept",
+      "description": "Custom semantic concept or fact stored in the cloud memory matrix",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "key": { "type": "string" },
+        "type": { "type": "string" },
+        "category": { "type": "string" },
+        "data": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "key", "type", "data", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/memory_snapshots/{snapshotId}": {
+      "entity": "MemorySnapshot",
+      "description": "Cloud snapshots of the memory matrix"
+    },
+    "/thinking_sessions/{sessionId}": {
+      "entity": "ThinkingSession",
+      "description": "Persisted thinking and reasoning sessions"
+    },
+    "/cognitive_concepts/{conceptId}": {
+      "entity": "CognitiveConcept",
+      "description": "Persisted semantic memory concepts"
+    }
+  }
+}

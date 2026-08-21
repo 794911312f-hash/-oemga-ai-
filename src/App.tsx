@@ -9,12 +9,55 @@ import { CodeSandbox } from "./components/CodeSandbox";
 import { LatexStudio } from "./components/LatexStudio";
 import { ChronoMatrix } from "./components/ChronoMatrix";
 import { CodebaseExplorer } from "./components/CodebaseExplorer";
+import { MediaStudio } from "./components/MediaStudio";
+import { BlueprintStudio } from "./components/BlueprintStudio";
+import { SocialIntelligence } from "./components/SocialIntelligence";
+import { FreeCloudServers } from "./components/FreeCloudServers";
 import { BrainState, ConsciousnessState, OptimizerTelemetry, ThoughtTrace, ReasoningStrategy, ChatAttachment } from "./types";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>("brain");
   const [isThinking, setIsThinking] = useState<boolean>(false);
   const [thoughtTraces, setThoughtTraces] = useState<ThoughtTrace[]>([]);
+  const [isFocusMode, setIsFocusMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("omega_deep_focus_mode") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleFocusMode = () => {
+    setIsFocusMode((prev) => {
+      const nextVal = !prev;
+      try {
+        localStorage.setItem("omega_deep_focus_mode", String(nextVal));
+      } catch (e) {
+        console.error(e);
+      }
+      return nextVal;
+    });
+  };
+
+  // Start a clean new discussion window
+  const handleStartNewSession = () => {
+    setThoughtTraces([]);
+    setActiveTab("brain");
+  };
+
+  // Keyboard shortcut listener (Esc to exit focus mode)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFocusMode) {
+        setIsFocusMode(false);
+        try {
+          localStorage.setItem("omega_deep_focus_mode", "false");
+        } catch {}
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFocusMode]);
 
   const [brainState, setBrainState] = useState<BrainState>({
     attention_level: 0.85,
@@ -155,9 +198,13 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-['IBM_Plex_Sans_Arabic','Plus_Jakarta_Sans',sans-serif]">
-      {/* Dynamic Background Glow */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+    <div className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-['IBM_Plex_Sans_Arabic','Plus_Jakarta_Sans',sans-serif] ${
+      isFocusMode ? "focus-mode-active" : ""
+    }`}>
+      {/* Dynamic Background Glow - Muted in Deep Focus Mode */}
+      <div className={`fixed inset-0 pointer-events-none overflow-hidden -z-10 transition-opacity duration-500 ${
+        isFocusMode ? "opacity-20" : "opacity-100"
+      }`}>
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse-slow" />
         <div className="absolute top-1/3 -left-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: "2s" }} />
         <div className="absolute -bottom-40 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: "4s" }} />
@@ -172,6 +219,8 @@ export default function App() {
         optimizer={optimizer}
         onResetMemory={handleResetMemory}
         isProcessing={isThinking}
+        isFocusMode={isFocusMode}
+        onToggleFocusMode={toggleFocusMode}
       />
 
       {/* Main View Area */}
@@ -181,6 +230,41 @@ export default function App() {
             onSendMessage={handleSendMessage}
             isThinking={isThinking}
             thoughtTraces={thoughtTraces}
+            isFocusMode={isFocusMode}
+            onRestoreSession={(traces) => setThoughtTraces(traces)}
+            onNewSession={handleStartNewSession}
+          />
+        )}
+        {activeTab === "media" && (
+          <MediaStudio
+            onSendToBrain={(mediaPrompt) => {
+              setActiveTab("brain");
+              handleSendMessage(mediaPrompt, "tree_of_thought");
+            }}
+          />
+        )}
+        {activeTab === "blueprints" && (
+          <BlueprintStudio
+            onSendToBrain={(bpPrompt) => {
+              setActiveTab("brain");
+              handleSendMessage(bpPrompt, "tree_of_thought");
+            }}
+          />
+        )}
+        {activeTab === "social" && (
+          <SocialIntelligence
+            onSendToBrain={(socialPrompt) => {
+              setActiveTab("brain");
+              handleSendMessage(socialPrompt, "tree_of_thought");
+            }}
+          />
+        )}
+        {activeTab === "servers" && (
+          <FreeCloudServers
+            onSendToBrain={(serverDataPrompt) => {
+              setActiveTab("brain");
+              handleSendMessage(serverDataPrompt, "tree_of_thought");
+            }}
           />
         )}
         {activeTab === "codebase" && (

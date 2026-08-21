@@ -29,21 +29,45 @@ import {
   ScrollText,
   FlaskConical,
   Feather,
-  CheckCircle2
+  CheckCircle2,
+  Cloud,
+  CloudUpload,
+  CloudDownload,
+  History,
+  Trash2,
+  Database,
+  Plus,
+  HelpCircle,
+  AlertCircle,
+  Filter
 } from "lucide-react";
-import { ThoughtTrace, ReasoningStrategy, ChatAttachment } from "../types";
+import { ThoughtTrace, ReasoningStrategy, ChatAttachment, EpistemicClaimType } from "../types";
 import { MathRenderer } from "./MathRenderer";
+import { ProbabilisticToTVisualizer } from "./ProbabilisticToTVisualizer";
+import { MetaCognitiveVerifier } from "./MetaCognitiveVerifier";
+import { 
+  saveThinkingSessionToCloud, 
+  fetchThinkingSessionsFromCloud, 
+  deleteThinkingSessionFromCloud, 
+  CloudThinkingSession 
+} from "../lib/firebase";
 
 interface BrainChatProps {
   onSendMessage: (text: string, strategy: ReasoningStrategy, attachments?: ChatAttachment[]) => void;
   isThinking: boolean;
   thoughtTraces: ThoughtTrace[];
+  isFocusMode?: boolean;
+  onRestoreSession?: (traces: ThoughtTrace[]) => void;
+  onNewSession?: () => void;
 }
 
 export const BrainChat: React.FC<BrainChatProps> = ({
   onSendMessage,
   isThinking,
   thoughtTraces,
+  isFocusMode = false,
+  onRestoreSession,
+  onNewSession,
 }) => {
   const [inputText, setInputText] = useState("");
   const [strategy, setStrategy] = useState<ReasoningStrategy>("tree_of_thought");
@@ -53,6 +77,15 @@ export const BrainChat: React.FC<BrainChatProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [selectedImageModal, setSelectedImageModal] = useState<string | null>(null);
   const [showFormulaDrawer, setShowFormulaDrawer] = useState<boolean>(false);
+
+  // Epistemic Truth Filter: all | facts | hypotheses | proposals
+  const [epistemicFilter, setEpistemicFilter] = useState<"all" | "facts" | "hypotheses" | "proposals">("all");
+
+  // Firebase Sessions State
+  const [savedSessions, setSavedSessions] = useState<CloudThinkingSession[]>([]);
+  const [showSessionsModal, setShowSessionsModal] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
+  const [sessionSaveFeedback, setSessionSaveFeedback] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -124,6 +157,55 @@ export const BrainChat: React.FC<BrainChatProps> = ({
       setExpandedTraceId(thoughtTraces[thoughtTraces.length - 1].id);
     }
   }, [thoughtTraces]);
+
+  const loadCloudSessions = async () => {
+    const sessions = await fetchThinkingSessionsFromCloud(15);
+    setSavedSessions(sessions);
+  };
+
+  useEffect(() => {
+    loadCloudSessions();
+  }, []);
+
+  const handleSaveCurrentSessionToCloud = async () => {
+    if (thoughtTraces.length === 0) return;
+    setIsSavingSession(true);
+    setSessionSaveFeedback(null);
+    try {
+      const firstInput = thoughtTraces[0]?.input || "جلسة استدلال معرفية";
+      const title = firstInput.slice(0, 50) + (firstInput.length > 50 ? "..." : "");
+      const sessionId = `session_${Date.now()}`;
+      const res = await saveThinkingSessionToCloud(sessionId, title, thoughtTraces, strategy);
+      if (res.success) {
+        setSessionSaveFeedback("تم حفظ جلسة التفكير بنجاح في Firebase Firestore!");
+        await loadCloudSessions();
+        setTimeout(() => setSessionSaveFeedback(null), 4000);
+      } else {
+        setSessionSaveFeedback("تعذر حفظ الجلسة: " + (res.error || ""));
+      }
+    } catch (e: any) {
+      setSessionSaveFeedback("حدث خطأ أثناء الحفظ السحابي");
+    } finally {
+      setIsSavingSession(false);
+    }
+  };
+
+  const handleRestoreSessionFromCloud = (session: CloudThinkingSession) => {
+    if (session.traces && onRestoreSession) {
+      onRestoreSession(session.traces);
+      if (session.activeStrategy) {
+        setStrategy(session.activeStrategy as ReasoningStrategy);
+      }
+      setShowSessionsModal(false);
+    }
+  };
+
+  const handleDeleteCloudSession = async (sessionId: string) => {
+    const ok = await deleteThinkingSessionFromCloud(sessionId);
+    if (ok) {
+      setSavedSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    }
+  };
 
   const handleFiles = async (files: FileList | File[]) => {
     const fileList = Array.from(files);
@@ -212,7 +294,11 @@ export const BrainChat: React.FC<BrainChatProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex flex-col h-[calc(100vh-8.5rem)] max-w-6xl mx-auto px-4 py-4 relative transition-colors ${
+      className={`flex flex-col max-w-6xl mx-auto px-4 py-4 relative transition-all duration-300 ${
+        isFocusMode 
+          ? "h-[calc(100vh-5rem)] max-w-5xl" 
+          : "h-[calc(100vh-8.5rem)]"
+      } ${
         isDragging ? "ring-2 ring-indigo-500/80 bg-indigo-950/20 rounded-3xl" : ""
       }`}
     >
@@ -263,18 +349,126 @@ export const BrainChat: React.FC<BrainChatProps> = ({
           </div>
         </div>
 
-        {/* Quick Actions (Math & Physics Formulas Drawer) */}
-        <div className="flex items-center gap-2">
+        {/* Quick Actions (New Window, Firebase Cloud Sync & Math Formulas) */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* New Discussion Window Button */}
+          {onNewSession && (
+            <button
+              type="button"
+              onClick={onNewSession}
+              id="new-discussion-window-btn"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-900/20 cursor-pointer"
+              title="فتح نافذة نقاش ومحادثة جديدة تماماً مع تصفير السياق"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>محادثة جديدة</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-indigo-500/20">
+            {thoughtTraces.length > 0 && (
+              <button
+                type="button"
+                onClick={handleSaveCurrentSessionToCloud}
+                disabled={isSavingSession}
+                id="firebase-save-chat-session-btn"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white text-[11px] font-bold transition-all shadow-sm disabled:opacity-50"
+                title="حفظ جلسة التفكير الحالية مع كافة الفروع في Firebase"
+              >
+                <CloudUpload className={`w-3 h-3 ${isSavingSession ? "animate-bounce" : ""}`} />
+                <span>حفظ الجلسة</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                loadCloudSessions();
+                setShowSessionsModal(true);
+              }}
+              id="firebase-view-sessions-btn"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 text-[11px] font-semibold transition-all"
+              title="استعراض وتذكر جلسات التفكير السابقة المحفوظة في الذاكرة"
+            >
+              <History className="w-3 h-3 text-indigo-400" />
+              <span>المحادثات السابقة ({savedSessions.length})</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setShowFormulaDrawer(!showFormulaDrawer)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/50 text-xs font-semibold text-indigo-300 transition-all shadow-sm"
           >
             <Sigma className="w-3.5 h-3.5 text-indigo-400" />
-            <span>معادلات الرياضيات والفيزياء</span>
+            <span>معادلات LaTeX</span>
           </button>
         </div>
       </div>
+
+      {/* Epistemic Truth & Human Distinction Filtering Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/70 border border-slate-800/80 rounded-xl px-3.5 py-2 mb-4 text-xs">
+        <div className="flex items-center gap-2">
+          <Filter className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="text-slate-400 font-medium">الفصل المعرفي والتمييز الإدراكي:</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setEpistemicFilter("all")}
+            className={`px-2.5 py-1 rounded-lg transition-all font-medium ${
+              epistemicFilter === "all"
+                ? "bg-slate-800 text-white font-bold"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            الكل (سياق شامل)
+          </button>
+          <button
+            onClick={() => setEpistemicFilter("facts")}
+            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 font-medium ${
+              epistemicFilter === "facts"
+                ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold"
+                : "text-slate-400 hover:text-emerald-400"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>الحقائق والثوابت المبرهنة (Facts)</span>
+          </button>
+          <button
+            onClick={() => setEpistemicFilter("hypotheses")}
+            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 font-medium ${
+              epistemicFilter === "hypotheses"
+                ? "bg-amber-950 text-amber-300 border border-amber-500/40 font-bold"
+                : "text-slate-400 hover:text-amber-400"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span>الفرضيات والنظريات (Hypotheses)</span>
+          </button>
+          <button
+            onClick={() => setEpistemicFilter("proposals")}
+            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 font-medium ${
+              epistemicFilter === "proposals"
+                ? "bg-purple-950 text-purple-300 border border-purple-500/40 font-bold"
+                : "text-slate-400 hover:text-purple-400"
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-purple-400" />
+            <span>المقترحات والاجتهادات الاستدلالية (Proposals)</span>
+          </button>
+        </div>
+      </div>
+
+      {sessionSaveFeedback && (
+        <div className="mb-3 px-3 py-2 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{sessionSaveFeedback}</span>
+          </div>
+          <button onClick={() => setSessionSaveFeedback(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
+        </div>
+      )}
 
       {/* Math & Physics Formula Insertion Palette */}
       {showFormulaDrawer && (
@@ -418,23 +612,23 @@ export const BrainChat: React.FC<BrainChatProps> = ({
                         <span>سجل التفكير المعرفي (Thought Trace)</span>
                       </span>
 
-                      {/* Literary vs Scientific Domain Badge */}
+                      {/* Literary vs Scientific vs General Domain Badge */}
                       {trace.classification && (
                         <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg border ${
                           trace.classification.type === "literary"
                             ? "bg-rose-500/15 border-rose-500/30 text-rose-300"
                             : trace.classification.type === "scientific"
                             ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300"
-                            : "bg-purple-500/15 border-purple-500/30 text-purple-300"
+                            : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
                         }`}>
                           {trace.classification.type === "literary" ? (
                             <Feather className="w-3.5 h-3.5 text-rose-400" />
                           ) : trace.classification.type === "scientific" ? (
                             <FlaskConical className="w-3.5 h-3.5 text-cyan-400" />
                           ) : (
-                            <Atom className="w-3.5 h-3.5 text-purple-400" />
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                           )}
-                          <span>{trace.classification.domain_label || (trace.classification.type === "literary" ? "أدبي وبلاغي" : "علمي وفيزيائي")}</span>
+                          <span>{trace.classification.domain_label || (trace.classification.type === "literary" ? "أدبي وبلاغي" : trace.classification.type === "scientific" ? "علمي وفيزيائي" : "حوار عام وترحيب")}</span>
                         </span>
                       )}
 
@@ -461,21 +655,23 @@ export const BrainChat: React.FC<BrainChatProps> = ({
                             ? "bg-rose-950/20 border-rose-500/30"
                             : trace.classification.type === "scientific"
                             ? "bg-cyan-950/20 border-cyan-500/30"
-                            : "bg-purple-950/20 border-purple-500/30"
+                            : "bg-emerald-950/20 border-emerald-500/30"
                         }`}>
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               {trace.classification.type === "literary" ? (
                                 <BookOpen className="w-4 h-4 text-rose-400" />
-                              ) : (
+                              ) : trace.classification.type === "scientific" ? (
                                 <FlaskConical className="w-4 h-4 text-cyan-400" />
+                              ) : (
+                                <Sparkles className="w-4 h-4 text-emerald-400" />
                               )}
                               <span className="text-xs font-bold text-slate-100">
                                 تشخيص وتمايز السؤال: {trace.classification.domain_label}
                               </span>
                             </div>
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
-                              مستوى العمق: {trace.classification.depth_level || "متقدم"}
+                              مستوى العمق: {trace.classification.depth_level || "مباشر"}
                             </span>
                           </div>
 
@@ -506,47 +702,133 @@ export const BrainChat: React.FC<BrainChatProps> = ({
                         </div>
                       )}
 
-                      {/* 1. Tree of Thought Visualizer */}
-                      {trace.reasoning.branches && trace.reasoning.branches.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200 mb-2">
-                            <GitFork className="w-3.5 h-3.5 text-indigo-400" />
-                            <span>مسارات التفكير الشجري (ToT Multi-Branch Exploration):</span>
+                      {/* 0.5. Epistemic Truth Matrix & Human Cognitive Distinction (حقائق / فرضيات / مقترحات) */}
+                      {trace.epistemic_matrix && (
+                        <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80 shadow-lg space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-100">
+                              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                              <span>مصفوفة الفصل المعرفي الدقيق (Epistemic Matrix):</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] font-mono">
+                              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30">
+                                حقائق: {((trace.epistemic_matrix.fact_ratio || 0.7) * 100).toFixed(0)}%
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/30">
+                                فرضيات: {((trace.epistemic_matrix.hypothesis_ratio || 0.15) * 100).toFixed(0)}%
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/30">
+                                مقترحات: {((trace.epistemic_matrix.proposal_ratio || 0.15) * 100).toFixed(0)}%
+                              </span>
+                            </div>
                           </div>
+
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                            {trace.reasoning.branches.map((branch) => {
-                              const isBest = trace.reasoning.best_branch?.id === branch.id;
-                              return (
-                                <div
-                                  key={branch.id}
-                                  className={`p-3 rounded-xl border transition-all text-xs ${
-                                    isBest
-                                      ? "bg-indigo-950/40 border-indigo-500/60 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500/40"
-                                      : "bg-slate-900/50 border-slate-800 text-slate-300"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between mb-1.5">
-                                    <span className="font-bold flex items-center gap-1">
-                                      {isBest && <Award className="w-3.5 h-3.5 text-amber-400" />}
-                                      <span>المسار {branch.id}</span>
-                                    </span>
-                                    <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${
-                                      isBest ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-slate-800 text-slate-400"
-                                    }`}>
-                                      درجة التقييم: {(branch.score * 100).toFixed(0)}%
-                                    </span>
-                                  </div>
-                                  <div className="text-slate-300 leading-relaxed">
-                                    <MathRenderer content={branch.content} />
-                                  </div>
+                            {/* Facts Column */}
+                            <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/30 space-y-1.5">
+                              <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-300">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                                <span>الحقائق والثوابت المؤكدة</span>
+                              </div>
+                              <ul className="space-y-1 text-[11px] text-slate-200">
+                                {trace.epistemic_matrix.facts?.map((fact, fIdx) => (
+                                  <li key={fIdx} className="flex items-start gap-1">
+                                    <span className="text-emerald-400 font-bold">✓</span>
+                                    <span>{fact}</span>
+                                  </li>
+                                )) || <li className="text-slate-400">بيانات علمية مبرهنة</li>}
+                              </ul>
+                            </div>
+
+                            {/* Hypotheses Column */}
+                            <div className="p-2.5 rounded-lg bg-amber-950/20 border border-amber-500/30 space-y-1.5">
+                              <div className="flex items-center gap-1 text-[11px] font-bold text-amber-300">
+                                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                <span>الفرضيات والنماذج قيد البحث</span>
+                              </div>
+                              <ul className="space-y-1 text-[11px] text-slate-200">
+                                {trace.epistemic_matrix.hypotheses?.map((hypo, hIdx) => (
+                                  <li key={hIdx} className="flex items-start gap-1">
+                                    <span className="text-amber-400 font-bold">~</span>
+                                    <span>{hypo}</span>
+                                  </li>
+                                )) || <li className="text-slate-400">فرضيات علمية تتطلب برهنة</li>}
+                              </ul>
+                            </div>
+
+                            {/* Proposals Column with Explicit Disclaimer */}
+                            <div className="p-2.5 rounded-lg bg-purple-950/20 border border-purple-500/30 space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-purple-300">
+                                <div className="flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full bg-purple-400" />
+                                  <span>المقترحات والاجتهادات</span>
                                 </div>
-                              );
-                            })}
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-purple-900/60 text-purple-200">غير قطعي</span>
+                              </div>
+                              <ul className="space-y-1 text-[11px] text-slate-200">
+                                {trace.epistemic_matrix.proposals?.map((prop, pIdx) => (
+                                  <li key={pIdx} className="flex items-start gap-1">
+                                    <span className="text-purple-400 font-bold">⚡</span>
+                                    <span>{prop}</span>
+                                  </li>
+                                )) || <li className="text-slate-400">اجتهاد استدلالي مقترح</li>}
+                              </ul>
+                              <div className="mt-1 pt-1 border-t border-purple-500/20 text-[10px] text-purple-300/80 italic">
+                                * تنبيه: هذا القسم يمثل اقتراحاً واجتهاداً استدلالياً من النموذج وليس حقيقة قطعية.
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
 
-                      {/* 2. Chain of Thought Steps if present */}
+                      {/* 0.8. Adaptive Vector Context Retrieval Card */}
+                      {trace.retrieved_vector_context && trace.retrieved_vector_context.length > 0 && (
+                        <div className="p-3.5 rounded-xl bg-cyan-950/20 border border-cyan-500/30 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Database className="w-4 h-4 text-cyan-400" />
+                              <span className="text-xs font-bold text-cyan-200">
+                                الذاكرة السياقية التكيفية المتجهة (Adaptive Vector Context):
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono bg-cyan-900/60 text-cyan-300 px-2 py-0.5 rounded border border-cyan-500/30">
+                              {trace.retrieved_vector_context.length} سياقات مسترجعة
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {trace.retrieved_vector_context.map((ctx, cIdx) => (
+                              <div key={cIdx} className="p-2 bg-slate-900/80 border border-slate-800 rounded-lg text-xs space-y-1">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="font-bold text-cyan-300">{ctx.title || ctx.category}</span>
+                                  <span className="font-mono text-slate-400">
+                                    تطابق: {(Math.max(0, (ctx.similarity + 1) / 2) * 100).toFixed(0)}%
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-300 line-clamp-2">{ctx.text}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 1. Meta-Cognitive Verification Layer (Verifier vs Knowledge Graph) */}
+                      {trace.meta_cognition && (
+                        <MetaCognitiveVerifier
+                          verification={trace.meta_cognition}
+                          targetClaim={trace.input}
+                        />
+                      )}
+
+                      {/* 2. Probabilistic Tree of Thought Visualizer: P(S) = \prod_{i=1}^n w_i \cdot C_i */}
+                      {trace.reasoning.branches && trace.reasoning.branches.length > 0 && (
+                        <ProbabilisticToTVisualizer
+                          branches={trace.reasoning.branches}
+                          bestBranchId={trace.reasoning.best_branch_id || trace.reasoning.best_branch?.id}
+                          formulaExpression={trace.reasoning.evaluation_formula}
+                        />
+                      )}
+
+                      {/* 3. Chain of Thought Steps if present */}
                       {trace.reasoning.steps && trace.reasoning.steps.length > 0 && (
                         <div>
                           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200 mb-2">
@@ -781,6 +1063,85 @@ export const BrainChat: React.FC<BrainChatProps> = ({
           </button>
         </div>
       </form>
+      {/* Firebase Cloud Sessions Modal */}
+      {showSessionsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Cloud className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-base font-bold text-white">جلسات التفكير المحفوظة سحابياً (Firebase Firestore)</h3>
+              </div>
+              <button onClick={() => setShowSessionsModal(false)} className="text-slate-400 hover:text-white text-xs">
+                ✕ إغلاق
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+              {savedSessions.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 space-y-2">
+                  <History className="w-10 h-10 mx-auto text-slate-600 stroke-[1.5]" />
+                  <p className="text-sm">لا توجد جلسات تفكير محفوظة سحابياً بعد.</p>
+                  <p className="text-xs text-slate-500">يمكنك حفظ جلستك الحالية بالنقر على "حفظ الجلسة" في شريط الأدوات أعلاه.</p>
+                </div>
+              ) : (
+                savedSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 hover:border-indigo-500/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-100">{session.title}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono">
+                          {new Date(session.timestamp).toLocaleDateString("ar-SA")}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 font-mono">
+                          {session.traces?.length || 0} مسار تفكير
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2">
+                        <span>الاستراتيجية: {session.activeStrategy === "tree_of_thought" ? "شجرة التفكير (ToT)" : "سلسلة التفكير (CoT)"}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <button
+                        onClick={() => handleRestoreSessionFromCloud(session)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20"
+                        title="استرجاع هذه الجلسة إلى واجهة التفكير"
+                      >
+                        <CloudDownload className="w-3.5 h-3.5" />
+                        <span>فتح واسترجاع</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCloudSession(session.id)}
+                        className="p-1.5 rounded-xl bg-slate-900 hover:bg-red-950/60 text-slate-400 hover:text-red-300 border border-slate-800 transition-colors"
+                        title="حذف الجلسة من Firebase"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="border-t border-slate-800 pt-3 flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-indigo-400" />
+                <span>إجمالي الجلسات السحابية: {savedSessions.length}</span>
+              </div>
+              <button
+                onClick={() => setShowSessionsModal(false)}
+                className="px-4 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-medium"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

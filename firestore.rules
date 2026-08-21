@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    match /memory_snapshots/{snapshotId} {
+      allow read: if true;
+      allow create, update: if isValidId(snapshotId)
+        && request.resource.data.keys().hasAll(['id', 'title', 'timestamp'])
+        && request.resource.data.id is string
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.timestamp is number;
+      allow delete: if isValidId(snapshotId);
+    }
+
+    match /thinking_sessions/{sessionId} {
+      allow read: if true;
+      allow create, update: if isValidId(sessionId)
+        && request.resource.data.keys().hasAll(['id', 'title', 'updatedAt'])
+        && request.resource.data.id is string
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.updatedAt is number;
+      allow delete: if isValidId(sessionId);
+    }
+
+    match /cognitive_concepts/{conceptId} {
+      allow read: if true;
+      allow create, update: if isValidId(conceptId)
+        && request.resource.data.keys().hasAll(['id', 'key', 'type', 'data', 'createdAt'])
+        && request.resource.data.id is string
+        && request.resource.data.key is string
+        && request.resource.data.type is string
+        && request.resource.data.data is string
+        && request.resource.data.createdAt is number;
+      allow delete: if isValidId(conceptId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
