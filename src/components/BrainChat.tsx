@@ -39,12 +39,15 @@ import {
   Plus,
   HelpCircle,
   AlertCircle,
-  Filter
+  Filter,
+  Globe
 } from "lucide-react";
 import { ThoughtTrace, ReasoningStrategy, ChatAttachment, EpistemicClaimType } from "../types";
 import { MathRenderer } from "./MathRenderer";
 import { ProbabilisticToTVisualizer } from "./ProbabilisticToTVisualizer";
 import { MetaCognitiveVerifier } from "./MetaCognitiveVerifier";
+import { CognitivePipelineFlow } from "./CognitivePipelineFlow";
+import { CentralOrchestratorView } from "./CentralOrchestratorView";
 import { 
   saveThinkingSessionToCloud, 
   fetchThinkingSessionsFromCloud, 
@@ -53,7 +56,7 @@ import {
 } from "../lib/firebase";
 
 interface BrainChatProps {
-  onSendMessage: (text: string, strategy: ReasoningStrategy, attachments?: ChatAttachment[]) => void;
+  onSendMessage: (text: string, strategy: ReasoningStrategy, attachments?: ChatAttachment[], options?: { enableSearchAgent?: boolean }) => void;
   isThinking: boolean;
   thoughtTraces: ThoughtTrace[];
   isFocusMode?: boolean;
@@ -71,6 +74,7 @@ export const BrainChat: React.FC<BrainChatProps> = ({
 }) => {
   const [inputText, setInputText] = useState("");
   const [strategy, setStrategy] = useState<ReasoningStrategy>("tree_of_thought");
+  const [searchAgentActive, setSearchAgentActive] = useState<boolean>(true);
   const [expandedTraceId, setExpandedTraceId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -92,6 +96,14 @@ export const BrainChat: React.FC<BrainChatProps> = ({
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const presetPrompts = [
+    { 
+      title: "🌐 الأخبار الحية والتقصي اللحظي: أحدث مستجدات الجزائر اليوم", 
+      text: "ما هي أحدث الأخبار والمستجدات الميدانية والقرارات في الجزائر اليوم مع ذكر المصادر الموثوقة والتواريخ اللحظية؟" 
+    },
+    { 
+      title: "🎨 توليد صورة: ساحر شرير أمام قلعة قديمة (2D)", 
+      text: "ارسم صورة لساحر شرير امام قلعة قديمة , 2D" 
+    },
     { 
       title: "💻 الوعي الذاتي: الكود المصدري ومعمارية نظام Omega AI", 
       text: "ما هو الكود المستعمل في إنشائك وبنائك؟ اشرح لي المعمارية البرمجية بالتفصيل، كيف تم تنظيم ملف server.ts و App.tsx وبقية المكونات، وكيف تتكامل خوارزميات التفكير والذاكرة؟" 
@@ -267,7 +279,7 @@ export const BrainChat: React.FC<BrainChatProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if ((!inputText.trim() && attachments.length === 0) || isThinking) return;
-    onSendMessage(inputText, strategy, attachments);
+    onSendMessage(inputText, strategy, attachments, { enableSearchAgent: searchAgentActive });
     setInputText("");
     setAttachments([]);
   };
@@ -347,6 +359,25 @@ export const BrainChat: React.FC<BrainChatProps> = ({
               <span>سلسلة التفكير (CoT)</span>
             </button>
           </div>
+
+          {/* Search Agent Live Toggle */}
+          <button
+            type="button"
+            onClick={() => setSearchAgentActive(!searchAgentActive)}
+            id="search-agent-toggle-btn"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+              searchAgentActive
+                ? "bg-emerald-950/80 border-emerald-500/50 text-emerald-300 shadow-sm shadow-emerald-900/20"
+                : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
+            }`}
+            title="تفعيل وكيل البحث الحي (Search Agent) عبر Google Search Grounding للتحقق من الأخبار اللحظية والمعطيات الميدانية"
+          >
+            <Globe className={`w-3.5 h-3.5 ${searchAgentActive ? "text-emerald-400 animate-pulse" : "text-slate-500"}`} />
+            <span>Search Agent (Google Search)</span>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono ${searchAgentActive ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-800 text-slate-400"}`}>
+              {searchAgentActive ? "نشط" : "معطل"}
+            </span>
+          </button>
         </div>
 
         {/* Quick Actions (New Window, Firebase Cloud Sync & Math Formulas) */}
@@ -648,6 +679,57 @@ export const BrainChat: React.FC<BrainChatProps> = ({
                   {/* Collapsible Deep Cognitive Details */}
                   {isExpanded && (
                     <div className="p-4 bg-slate-950/40 border-b border-slate-800/60 space-y-4">
+                      {/* 0. Dynamic Central Orchestrator Decisions View */}
+                      {trace.orchestrator_decision && (
+                        <CentralOrchestratorView decision={trace.orchestrator_decision} userQuery={trace.input} />
+                      )}
+
+                      {/* Flow Diagram: The Complete Cognitive Execution Pipeline */}
+                      <CognitivePipelineFlow trace={trace} />
+
+                      {/* Search Agent Live Grounding Step */}
+                      {trace.search_agent_result && (
+                        <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Globe className="w-4 h-4 text-emerald-400 animate-pulse" />
+                              <span className="text-xs font-bold text-emerald-200">
+                                وكيل البحث الميداني الحي (Google Search Grounding Agent)
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {trace.search_agent_result.latency_ms && (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
+                                  {trace.search_agent_result.latency_ms} ms
+                                </span>
+                              )}
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-200 border border-emerald-500/30">
+                                {trace.search_agent_result.source_engine || "Google Search Engine"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-slate-300 space-y-1">
+                            <p>
+                              <strong className="text-slate-200">استعلامات البحث المنفذة: </strong>
+                              <span className="font-mono text-emerald-300">
+                                {trace.search_agent_result.executed_queries && trace.search_agent_result.executed_queries.length > 0
+                                  ? trace.search_agent_result.executed_queries.join(" • ")
+                                  : trace.search_agent_result.query}
+                              </span>
+                            </p>
+                            {trace.search_agent_result.search_queries && trace.search_agent_result.search_queries.length > 0 && (
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {trace.search_agent_result.search_queries.map((q, qIdx) => (
+                                  <span key={qIdx} className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-emerald-500/20 text-emerald-300 font-mono">
+                                    🔍 {q}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* 0. Question Comprehension & Domain Analysis Card */}
                       {trace.classification && (
                         <div className={`p-3.5 rounded-xl border ${
@@ -916,6 +998,137 @@ export const BrainChat: React.FC<BrainChatProps> = ({
                       </button>
                     </div>
 
+                    {/* Visual Artwork Display */}
+                    {trace.generated_image && (
+                      <div className="mb-5 rounded-2xl overflow-hidden border border-indigo-500/40 bg-slate-950/80 shadow-2xl">
+                        <div className="p-3 bg-gradient-to-r from-indigo-950/80 via-slate-900 to-purple-950/80 border-b border-indigo-500/20 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                              <ImageIcon className="w-4 h-4" />
+                            </span>
+                            <div>
+                              <span className="text-xs font-bold text-slate-100 block">
+                                اللوحة البصرية المولدة (AI Generated Artwork)
+                              </span>
+                              <span className="text-[10px] text-indigo-300/80 font-mono">
+                                الأسلوب: {trace.generated_image.style || "2D Digital Illustration"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedImageModal(trace.generated_image?.url || null)}
+                              className="flex items-center gap-1 text-xs text-indigo-300 hover:text-white px-2.5 py-1 rounded-lg bg-indigo-950/60 border border-indigo-500/30 hover:border-indigo-400 transition-all"
+                            >
+                              <Maximize2 className="w-3.5 h-3.5" />
+                              <span>تكبير وعرض كامل</span>
+                            </button>
+                            <a
+                              href={trace.generated_image.url}
+                              download="omega-artwork.jpg"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 text-xs text-emerald-300 hover:text-white px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-500/30 hover:border-emerald-400 transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>تحميل</span>
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Image Preview */}
+                        <div className="relative group max-h-[500px] flex items-center justify-center bg-slate-950 p-2 overflow-hidden">
+                          <img
+                            src={trace.generated_image.url}
+                            alt={trace.generated_image.prompt}
+                            referrerPolicy="no-referrer"
+                            className="max-h-[460px] w-auto max-w-full rounded-xl object-contain shadow-2xl transition-transform duration-300 group-hover:scale-[1.01]"
+                          />
+                        </div>
+
+                        {/* Image Metadata & Prompt Bar */}
+                        <div className="p-3 bg-slate-900/90 border-t border-slate-800 text-xs flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400">
+                            <span className="font-mono text-indigo-300">
+                              ✦ الطلب الأصلي: {trace.generated_image.prompt}
+                            </span>
+                            <span className="text-[10px] font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-emerald-300">
+                              {trace.generated_image.engine || "Gemini / Neural Visual Engine"}
+                            </span>
+                          </div>
+                          {trace.generated_image.revised_prompt && (
+                            <p className="text-[10px] font-mono text-slate-400/90 bg-slate-950/60 p-2 rounded border border-slate-800/80 leading-relaxed">
+                              <strong className="text-slate-300">Prompt التوليد البصري المحسّن: </strong>
+                              {trace.generated_image.revised_prompt}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Search Agent Live Grounding & Verified Sources Card */}
+                    {trace.search_agent_result && (
+                      <div className="mb-5 p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900/80 to-teal-950/40 border border-emerald-500/40 text-xs shadow-xl">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-3 mb-3">
+                          <div className="flex items-center gap-2.5">
+                            <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-inner">
+                              <Globe className="w-4 h-4 animate-pulse" />
+                            </span>
+                            <div>
+                              <span className="font-bold text-emerald-200 block text-xs">
+                                وكيل التقصي والبحث اللحظي (Google Search Agent & Ground Truth)
+                              </span>
+                              <span className="text-[10px] text-emerald-400/90">
+                                تم جلب أحدث الأخبار والمعطيات الميدانية لحظياً والتحقق من مصداقيتها عبر الويب
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] font-mono">
+                            {trace.search_agent_result.latency_ms && (
+                              <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
+                                زمن الاستجابة: {trace.search_agent_result.latency_ms} ms
+                              </span>
+                            )}
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-900/80 text-emerald-200 border border-emerald-500/40 flex items-center gap-1.5 font-bold shadow-sm">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                              <span>بث مباشر لحظي</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {trace.search_agent_result.grounding_sources && trace.search_agent_result.grounding_sources.length > 0 && (
+                          <div className="space-y-2">
+                            <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
+                              <span>المصادر والروابط الإخبارية الموثقة لحظياً:</span>
+                              <span className="text-[10px] font-normal text-emerald-400">({trace.search_agent_result.grounding_sources.length} مصادر)</span>
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {trace.search_agent_result.grounding_sources.map((src, sIdx) => (
+                                <a
+                                  key={sIdx}
+                                  href={src.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-emerald-500/20 hover:border-emerald-500/50 text-slate-200 transition-all group shadow-sm"
+                                >
+                                  <div className="truncate flex-1 pl-2 text-right">
+                                    <span className="text-[11px] font-bold text-emerald-300 group-hover:text-emerald-200 block truncate">
+                                      {src.title}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 truncate block font-mono">
+                                      {src.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 40)}...
+                                    </span>
+                                  </div>
+                                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="text-sm font-normal leading-relaxed text-slate-100">
                       <MathRenderer content={trace.response} />
                     </div>
@@ -1139,6 +1352,41 @@ export const BrainChat: React.FC<BrainChatProps> = ({
                 إغلاق
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Image Preview Modal */}
+      {selectedImageModal && (
+        <div 
+          onClick={() => setSelectedImageModal(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 cursor-zoom-out animate-fadeIn"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -top-10 right-0 flex items-center gap-2">
+              <a
+                href={selectedImageModal}
+                download="artwork.jpg"
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white text-xs flex items-center gap-1 px-3 border border-slate-700"
+              >
+                <Download className="w-4 h-4" />
+                <span>تحميل الصورة</span>
+              </a>
+              <button
+                onClick={() => setSelectedImageModal(null)}
+                className="p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white border border-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <img
+              src={selectedImageModal}
+              alt="Generated Visual"
+              referrerPolicy="no-referrer"
+              className="max-h-[85vh] max-w-full rounded-2xl shadow-2xl border border-slate-800 object-contain"
+            />
           </div>
         </div>
       )}

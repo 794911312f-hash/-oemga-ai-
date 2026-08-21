@@ -104,7 +104,12 @@ export default function App() {
       .catch((err) => console.log("Initial state load:", err));
   }, []);
 
-  const handleSendMessage = async (text: string, strategy: ReasoningStrategy, attachments?: ChatAttachment[]) => {
+  const handleSendMessage = async (
+    text: string, 
+    strategy: ReasoningStrategy, 
+    attachments?: ChatAttachment[],
+    options?: { enableSearchAgent?: boolean }
+  ) => {
     setIsThinking(true);
     try {
       const res = await fetch("/api/think", {
@@ -114,6 +119,7 @@ export default function App() {
           input_text: text,
           strategy,
           attachments: attachments || [],
+          enable_search_agent: options?.enableSearchAgent ?? true,
         }),
       });
 

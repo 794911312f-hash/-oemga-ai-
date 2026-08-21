@@ -172,12 +172,82 @@ export interface ChatAttachment {
   extractedText?: string;
 }
 
+export interface DynamicOrchestratorStep {
+  step_number: number;
+  node_key: 'memory' | 'agents' | 'search' | 'reasoning' | 'verifier' | 'world_model' | 'response';
+  node_name: string;
+  action: string;
+  is_activated: boolean;
+  order_priority: number;
+  rationale: string;
+  status: 'executed' | 'skipped' | 'bypassed' | 'active';
+}
+
+export interface CentralOrchestratorDecision {
+  call_memory: {
+    decision: boolean;
+    rationale: string;
+    modules_activated: ('sensory' | 'short_term' | 'episodic' | 'semantic' | 'vector')[];
+    retrieval_threshold: number;
+  };
+  use_agents: {
+    decision: boolean;
+    rationale: string;
+    selected_swarm_agents: string[];
+    coordination_strategy: 'parallel' | 'sequential' | 'hierarchical' | 'direct';
+  };
+  should_search: {
+    decision: boolean;
+    rationale: string;
+    search_type: 'web_search' | 'vector_semantic' | 'knowledge_graph' | 'none';
+    suggested_queries?: string[];
+  };
+  should_verify: {
+    decision: boolean;
+    rationale: string;
+    verification_level: 'strict_epistemic' | 'knowledge_graph_anchor' | 'standard' | 'light';
+    hallucination_check_required: boolean;
+  };
+  execution_schedule: {
+    strategy_name: string;
+    execution_order: DynamicOrchestratorStep[];
+    dynamic_graph_routing: string;
+    adaptive_cost_efficiency_score: number;
+  };
+}
+
+export interface GeneratedImageMetadata {
+  url: string;
+  prompt: string;
+  revised_prompt?: string;
+  style?: string;
+  aspect_ratio?: string;
+  width?: number;
+  height?: number;
+  engine?: string;
+  created_at?: string;
+}
+
+export interface SearchAgentResult {
+  query: string;
+  executed_queries: string[];
+  source_engine: string;
+  grounding_sources: Array<{ title: string; url: string; snippet?: string; source?: string }>;
+  verification_status: 'verified_live' | 'grounded_live_search' | 'cached';
+  latency_ms?: number;
+  timestamp?: string;
+  news_topics?: string[];
+}
+
 export interface ThoughtTrace {
   id: string;
   timestamp: string;
   input: string;
   classification?: QuestionClassification;
   attachments?: ChatAttachment[];
+  orchestrator_decision?: CentralOrchestratorDecision;
+  generated_image?: GeneratedImageMetadata;
+  search_agent_result?: SearchAgentResult;
   epistemic_matrix?: EpistemicMatrix;
   epistemic_claims?: EpistemicClaim[];
   meta_cognition?: MetaCognitiveVerification;
